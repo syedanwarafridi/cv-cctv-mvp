@@ -1,0 +1,7 @@
+numpy
+pandas
+deepface
+protobuf
+pyparsing
+flask
+Flask-Cors
