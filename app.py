@@ -354,44 +354,42 @@ def stream_face_detection():
                 res = DeepFace.find(img_path=temp_file, db_path="./Database", enforce_detection=False, model_name="Facenet512", detector_backend="retinaface", threshold=0.98)
 
                 face_data = []  # Store face data for the current frame
-                print(res)
-                # Access the first DataFrame in res (assuming it's a single DataFrame)
-                df = res[0] if res else None  # Ensure res is not empty
-                
-                if isinstance(df, pd.DataFrame) and not df.empty:
-                    # Process only the first row
-                    first_row = df.iloc[0]
 
-                    if first_row['identity'] and isinstance(first_row['identity'], str):
-                        parts = first_row['identity'].replace("\\", "/").split('/')
-                        if len(parts) > 1:
-                            name = parts[-2]  # Extract the name from the file path
-                            print(name)
-                        else:
-                            name = "Unknown"
+                for df in res:
+                    if isinstance(df, pd.DataFrame) and not df.empty:
+                        # Process only the first row
+                        first_row = df.iloc[0]
 
-                        # Extract face coordinates and dimensions
-                        xmin = int(first_row['source_x'])
-                        ymin = int(first_row['source_y'])
-                        w = int(first_row['source_w'])
-                        h = int(first_row['source_h'])
-                        xmax = xmin + w
-                        ymax = ymin + h
+                        if first_row['identity'] and isinstance(first_row['identity'], str):
+                            parts = first_row['identity'].replace("\\", "/").split('/')
+                            if len(parts) > 1:
+                                name = parts[-2]
+                            else:
+                                name = "Unknown"
 
-                        # Extract face image from the frame
-                        face_image = current_frame[ymin:ymax, xmin:xmax]
+                            xmin = int(first_row['source_x'])
+                            ymin = int(first_row['source_y'])
+                            w = int(first_row['source_w'])
+                            h = int(first_row['source_h'])
+                            xmax = xmin + w
+                            ymax = ymin + h
 
-                        # Convert face image to base64
-                        _, buffer = cv2.imencode('.jpg', face_image)
-                        face_image_base64 = base64.b64encode(buffer).decode('utf-8')
+                            face_image = current_frame[ymin:ymax, xmin:xmax]
 
-                        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            # Convert face image to base64
+                            _, buffer = cv2.imencode('.jpg', face_image)
+                            face_image_base64 = base64.b64encode(buffer).decode('utf-8')
 
-                        face_data.append({
-                            "name": name,
-                            "timestamp": timestamp,
-                            "face_image": face_image_base64  # Use base64 string for JSON serialization
-                        })
+                            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                            face_data.append({
+                                "name": name,
+                                "timestamp": timestamp,
+                                "face_image": face_image_base64  # Use base64 string for JSON serialization
+                            })
+
+                        # Break after processing the first row
+                        break
 
                 # Yield the face detection result for the current frame as a JSON string
                 yield f"data: {json.dumps(face_data)}\n\n"
