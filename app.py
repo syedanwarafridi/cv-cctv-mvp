@@ -233,33 +233,111 @@ import threading
 import base64
 import pandas as pd
 import json
+import time
 
 app = Flask(__name__)
 
 # Initialize CORS
 CORS(app)
-
+#cv2.VideoCapture("rtsp://admin:L20372DC@192.168.1.39:554/cam/realmonitor?channel=1&subtype=0", cv2.CAP_FFMPEG)
 # Global variables for the frame and face detection results
 frame = None
 lock = threading.Lock()
 
 # Function to capture frames from the camera
+# def capture_frames():
+#     global frame
+#     cap = cv2.VideoCapture(0, cv2.CAP_FFMPEG)
+#     #rtsp://Beta:beta6337715%40!@192.168.1.2/cam/realmonitor?channel=1&subtype=00&authbasic=QmV0YTpiZXRhNjMzNzcxNSU0MCE=
+#     cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)
+#     while True:
+#         success, new_frame = cap.read()
+#         if not success:
+#             break
+        
+#         with lock:
+#             frame = new_frame
+
+#     cap.release()
+
+
 def capture_frames():
     global frame
-    cap = cv2.VideoCapture("rtsp://admin:L20372DC@192.168.1.39:554/cam/realmonitor?channel=1&subtype=0", cv2.CAP_FFMPEG)
-    #rtsp://Beta:beta6337715%40!@192.168.1.2/cam/realmonitor?channel=1&subtype=00&authbasic=QmV0YTpiZXRhNjMzNzcxNSU0MCE=
+    time.sleep(1)  # Small delay before starting capture
+    cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)
     while True:
         success, new_frame = cap.read()
         if not success:
+            print("Failed to capture frame")
             break
         
         with lock:
             frame = new_frame
-
+            # print("Captured a frame")
     cap.release()
 
+
 # Function to detect faces from the camera feed and stream the results
+# def stream_face_detection():
+#     global frame
+#     while True:
+#         with lock:
+#             current_frame = frame.copy() if frame is not None else None
+
+#         if current_frame is not None:
+#             try:
+#                 # Save the frame temporarily as an image file
+#                 temp_file = "temp_frame.jpg"
+#                 cv2.imwrite(temp_file, current_frame)
+
+#                 # Perform face detection
+#                 res = DeepFace.find(img_path=temp_file, db_path="./Database", enforce_detection=False, model_name="Facenet512", detector_backend="retinaface", threshold=0.98)
+            
+#                 face_data = []  # Store face data for the current frame
+
+#                 for df in res:
+#                     if isinstance(df, pd.DataFrame) and not df.empty:
+#                         # Process only the first row
+#                         first_row = df.iloc[0]
+
+#                         if first_row['identity'] and isinstance(first_row['identity'], str):
+#                             parts = first_row['identity'].replace("\\", "/").split('/')
+#                             if len(parts) > 1:
+#                                 name = parts[-2]
+#                                 # print(name)
+#                             else:
+#                                 name = "Unknown"
+
+#                             xmin = int(first_row['source_x'])
+#                             ymin = int(first_row['source_y'])
+#                             w = int(first_row['source_w'])
+#                             h = int(first_row['source_h'])
+#                             xmax = xmin + w
+#                             ymax = ymin + h
+
+#                             face_image = current_frame[ymin:ymax, xmin:xmax]
+
+#                             # Convert face image to base64
+#                             _, buffer = cv2.imencode('.jpg', face_image)
+#                             face_image_base64 = base64.b64encode(buffer).decode('utf-8')
+
+#                             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+#                             face_data.append({
+#                                 "name": name,
+#                                 "timestamp": timestamp,
+#                                 "face_image": face_image_base64  # Use base64 string for JSON serialization
+#                             })
+
+#                         # Break after processing the first row
+#                         break
+
+#                 # Yield the face detection result for the current frame as a JSON string
+#                 yield f"data: {json.dumps(face_data)}\n\n"
+
+#             except Exception as e:
+#                 yield f"data: {{'error': 'An error occurred: {str(e)}'}}\n\n"
 def stream_face_detection():
     global frame
     while True:
@@ -276,45 +354,51 @@ def stream_face_detection():
                 res = DeepFace.find(img_path=temp_file, db_path="./Database", enforce_detection=False, model_name="Facenet512", detector_backend="retinaface", threshold=0.98)
 
                 face_data = []  # Store face data for the current frame
+                print(res)
+                # Access the first DataFrame in res (assuming it's a single DataFrame)
+                df = res[0] if res else None  # Ensure res is not empty
+                
+                if isinstance(df, pd.DataFrame) and not df.empty:
+                    # Process only the first row
+                    first_row = df.iloc[0]
 
-                for df in res:
-                    if isinstance(df, pd.DataFrame):
-                        for _, row in df.iterrows():
+                    if first_row['identity'] and isinstance(first_row['identity'], str):
+                        parts = first_row['identity'].replace("\\", "/").split('/')
+                        if len(parts) > 1:
+                            name = parts[-2]  # Extract the name from the file path
+                            print(name)
+                        else:
+                            name = "Unknown"
 
-                            if row['identity'] and isinstance(row['identity'], str):
-                                parts = row['identity'].replace("\\", "/").split('/')  
-                                if len(parts) > 1: 
-                                    name = parts[-2]  
-                                    print(name)
-                                else:
-                                    name = "Unknown"
+                        # Extract face coordinates and dimensions
+                        xmin = int(first_row['source_x'])
+                        ymin = int(first_row['source_y'])
+                        w = int(first_row['source_w'])
+                        h = int(first_row['source_h'])
+                        xmax = xmin + w
+                        ymax = ymin + h
 
-                                xmin = int(row['source_x'])
-                                ymin = int(row['source_y'])
-                                w = int(row['source_w'])
-                                h = int(row['source_h'])
-                                xmax = xmin + w
-                                ymax = ymin + h
+                        # Extract face image from the frame
+                        face_image = current_frame[ymin:ymax, xmin:xmax]
 
-                                face_image = current_frame[ymin:ymax, xmin:xmax]
-                                
-                                # Convert face image to base64
-                                _, buffer = cv2.imencode('.jpg', face_image)
-                                face_image_base64 = base64.b64encode(buffer).decode('utf-8')
+                        # Convert face image to base64
+                        _, buffer = cv2.imencode('.jpg', face_image)
+                        face_image_base64 = base64.b64encode(buffer).decode('utf-8')
 
-                                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                                face_data.append({
-                                    "name": name,
-                                    "timestamp": timestamp,
-                                    "face_image": face_image_base64  # Use base64 string for JSON serialization
-                                })
+                        face_data.append({
+                            "name": name,
+                            "timestamp": timestamp,
+                            "face_image": face_image_base64  # Use base64 string for JSON serialization
+                        })
 
                 # Yield the face detection result for the current frame as a JSON string
                 yield f"data: {json.dumps(face_data)}\n\n"
 
             except Exception as e:
                 yield f"data: {{'error': 'An error occurred: {str(e)}'}}\n\n"
+
 
 
 # Route to stream video feed
@@ -340,4 +424,5 @@ def detect_faces_stream():
 if __name__ == '__main__':
     # Start threads for capturing frames
     threading.Thread(target=capture_frames, daemon=True).start()
-    app.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=5000)
+
