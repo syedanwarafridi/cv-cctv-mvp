@@ -364,6 +364,7 @@ def stream_face_detection():
                             parts = first_row['identity'].replace("\\", "/").split('/')
                             if len(parts) > 1:
                                 name = parts[-2]
+                                print(name)
                             else:
                                 name = "Unknown"
 
