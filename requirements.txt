@@ -6,3 +6,4 @@ pyparsing
 flask
 Flask-Cors
 roboflow
+matplotlib
